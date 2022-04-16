@@ -1,0 +1,14 @@
+https://asdfsfagg.waet {
+    tls /tls/cert.crt /tls/key.key
+    @grpc {
+        protocol grpc
+        path  /2063ad18-eedd-48c2-b219-b0da2f891a97/*
+    }
+    reverse_proxy @grpc h2c://127.0.0.1:11514
+#    root * /var/www
+#    file_server
+    reverse_proxy * sdfsdf.rthr {
+	header_up Host {upstream_hostport}
+	header_up X-Forwarded-Host {host}
+}
+}
