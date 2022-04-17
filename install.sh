@@ -1,5 +1,5 @@
 #!/bin/bash
-
+stty erase ^H
 Precheck() {
     DOCKER_V=$(docker -v | grep -i "version")
     DC_V=$(docker-compose -v | grep -i "version")
@@ -127,11 +127,11 @@ ChangeUUID() {
 }
 
 Install() {
-    Precheck 1
-    if [ -e ".settings" ]; then
+    if [ -e ".settings" ] && [ -n "$(grep 'UUID' ./.settings | awk -F= '{print $2}')" ]; then
         UUID=$(grep 'UUID' ./.settings | awk -F= '{print $2}')
-        sed -i '/'"$UUID"'/d' /var/spool/cron/crontabs/"$(whoami)"
+        sed -i -E '/#'"$UUID"'$/d' /var/spool/cron/crontabs/"$(whoami)"
     fi
+    Precheck 1
     ChangeCF
     ChangeCaddy
     ChangeUUID
