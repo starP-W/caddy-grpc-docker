@@ -36,7 +36,7 @@ ChangeSettings() {
 }
 
 SetCF() {
-    
+
     read -p "Please Input Your CloudFlare Mailbox: " MAILBOX
     read -p "Please Input Your CloudFlare API_Key: " APIKEY
     sed -i -E "s|CF_Email=.+|CF_Email=$MAILBOX|g" ./docker-compose.yml
@@ -135,20 +135,45 @@ ChangeUUID() {
 }
 
 SetCert() {
-#    if [ -e "./tls/cert.crt" ] && [ -e "./tls/key.key" ]; then
-#        echo "Path \"./tls\" exists, using external certs."
-#        sed -i -E "2s|^(#+)?|#|g" ./Caddyfile
-#        sed -i -E "3s|^#+||g" ./Caddyfile
-#    else
+    #    if [ -e "./tls/cert.crt" ] && [ -e "./tls/key.key" ]; then
+    #        echo "Path \"./tls\" exists, using external certs."
+    #        sed -i -E "2s|^(#+)?|#|g" ./Caddyfile
+    #        sed -i -E "3s|^#+||g" ./Caddyfile
+    #    else
+    sed -i -E "3s|^(#+)?|#|g" ./Caddyfile
+    sed -i -E "2s|^#+||g" ./Caddyfile
+    FQDN=$(grep FQDN .settings | awk -F= '{print $2}')
+
+    echo -e "Apply for certificates from:\n1. Lest's Encrypt\n2. Zerossl (with cloudflare mailbox,default)\n3. Zerossl (using other mailbox)"
+    read SSL_Choice
+    case "${SSL_Choice}" in
+    1)
         echo "Applying for certs from Let's Encrypt."
-        sed -i -E "3s|^(#+)?|#|g" ./Caddyfile
-        sed -i -E "2s|^#+||g" ./Caddyfile
-        FQDN=$(grep FQDN .settings | awk -F= '{print $2}')
         docker-compose exec acme --issue --dns dns_cf -d $FQDN --server letsencrypt
         docker-compose exec acme --install-cert -d $FQDN --key-file /tls/key.key --fullchain-file /tls/cert.crt
-#    fi
+        ;;
+    3)
+        echo 'Applying for certs from Zerossl, using new Email address'
+        read -p 'Enter your mailbox for zerossl: ' Zero_Email
+        docker-compose exec acme --register-account -m "$Zero_Email" --server zerossl
+        docker-compose exec acme --issue --dns dns_cf -d $FQDN --server zerossl
+        docker-compose exec acme --install-cert -d $FQDN --key-file /tls/key.key --fullchain-file /tls/cert.crt
+        ChangeSettings "Zero_Email" $Zero_Email
+        ;;
+    *)
+        Zero_Email=$(grep CF_Email .settings | awk -F= '{print $2}')
+        echo "Applying for certs from Zerossl, using $Zero_Email"
+        docker-compose exec acme --register-account -m "$Zero_Email" --server zerossl
+        docker-compose exec acme --issue --dns dns_cf -d $FQDN --server zerossl
+        docker-compose exec acme --install-cert -d $FQDN --key-file /tls/key.key --fullchain-file /tls/cert.crt
+        ChangeSettings "Zero_Email" $Zero_Email
+        ;;
+    esac
+
+    #    fi
 
 }
+
 
 ShowShareLink() {
     UUID=$(grep 'UUID' ./.settings | awk -F= '{print $2}')
@@ -160,7 +185,7 @@ ShowShareLink() {
 Install() {
     if [ -e ".settings" ] && [ -n "$(grep 'UUID' ./.settings | awk -F= '{print $2}')" ]; then
         UUID=$(grep 'UUID' ./.settings | awk -F= '{print $2}')
-        crontab -l > ./.cron
+        crontab -l >./.cron
         sed -i -E '/#'"$UUID"'$/d' ./.cron
         crontab ./.cron
     fi
@@ -174,7 +199,7 @@ Install() {
     docker-compose restart
     if [ -e ".settings" ] && [ -n "$(grep 'UUID' ./.settings | awk -F= '{print $2}')" ]; then
         UUID=$(grep 'UUID' ./.settings | awk -F= '{print $2}')
-        crontab -l > ./.cron
+        crontab -l >./.cron
         if [ -e "/usr/bin/docker-compose" ]; then
             DockerComposePath="/usr/bin/docker-compose"
             echo "0 0 1 * * cd $PWD && $DockerComposePath restart #$UUID" >>./.cron
@@ -228,7 +253,7 @@ Update() {
 Uninstall() {
     if [ -e ".settings" ] && [ -n "$(grep 'UUID' ./.settings | awk -F= '{print $2}')" ]; then
         UUID=$(grep 'UUID' ./.settings | awk -F= '{print $2}')
-        crontab -l ./.cron
+        crontab -l > ./.cron
         sed -i -E '/#'"$UUID"'$/d' ./.cron
         crontab ./.cron
     fi
